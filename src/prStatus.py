@@ -12,7 +12,6 @@ import getpass
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
-
 def border_msg(*args):
     count = 0
     for msg in args:
@@ -27,8 +26,57 @@ def border_msg(*args):
         output += "| {msg} |\n".format(msg=msg.ljust(msgLength))
 
     output += "+{dash}+\n".format(dash=dash)
-
     return output
+
+#####################################################################################################
+def pr_query(query, authors, jiraIDPattern):
+    totalCount = 0
+    finalJIRAList = []
+    finalPRList = []
+
+    # PRs created
+    for author in authors:
+        print "*" * 50
+        print "Author       : {}".format(author)
+        search = query + author
+        searchBox = driver.find_element_by_id("js-issues-search")
+        searchBox.clear()
+        searchBox.send_keys(search)
+        searchBox.send_keys(Keys.ENTER)
+        time.sleep(5)
+
+        # PR details
+        JIRAs = []
+        PRs = []
+        prJiraDict = {}
+        JIRACount = 0
+        if len(driver.find_elements_by_xpath("//div[@class='border-right border-bottom border-left']")) > 0:
+            prList = driver.find_element_by_xpath("//div[@class='border-right border-bottom border-left']")
+            listItems = prList.find_elements_by_tag_name("li")
+            for item in listItems:
+                pRDescription = item.text
+                for line in pRDescription.splitlines():
+                    prMatch = re.match(r'(#\d+)', line)
+                    if prMatch:
+                        pr = prMatch.group()
+                        break
+                regex = r'({}-\d+)'.format(jiraIDPattern)
+                jiraNumsList = re.findall(regex, pRDescription)
+                prJiraDict.update({pr: jiraNumsList})
+                PRs.append(pr)
+                JIRAs.extend(jiraNumsList)
+                JIRACount += len(jiraNumsList)
+
+        totalCount += JIRACount
+        finalJIRAList.extend(JIRAs)
+        finalPRList.extend(PRs)
+
+        print "PR details   :"
+        for pr, jiraList in prJiraDict.iteritems():
+            print "     {}   -   {}".format(pr, ", ".join(jiraList))
+        print "JIRA Count   : {}".format(JIRACount)
+
+    return finalPRList, finalJIRAList, totalCount
 
 gitPRLink = ""
 userName = ""
@@ -62,41 +110,11 @@ print "_"*50
 print "Details of PRs Created"
 print "_"*50
 
-totalCount = 0
-finalJIRAList = []
+finalPRList, finalJIRAList, totalCount = pr_query(createdSearch, authors)
 
-#PRs created
-for author in authors:
-    print "*"*50
-    print "Author : {}".format(author)
-    search = createdSearch + author
-    searchBox = driver.find_element_by_id("js-issues-search")
-    searchBox.clear()
-    searchBox.send_keys(search)
-    searchBox.send_keys(Keys.ENTER)
-    time.sleep(5)
-
-    # PR details
-    JIRAs = []
-    JIRACount = 0
-    if len(driver.find_elements_by_xpath("//div[@class='border-right border-bottom border-left']")) > 0:
-        prList = driver.find_element_by_xpath("//div[@class='border-right border-bottom border-left']")
-        listItems = prList.find_elements_by_tag_name("li")
-        for item in listItems:
-            pRDescription = item.text
-            jiraNumsList = re.findall(r"(ESTCV-\d+)", pRDescription)
-            JIRAs.extend(jiraNumsList)
-            JIRACount += len(jiraNumsList)
-            # TODO:
-            # jiraNumsList.count() == 0:
-    totalCount += JIRACount
-    finalJIRAList.extend(JIRAs)
-
-    print "PR Raised for JIRAs : {}".format(", ".join(JIRAs))
-    print "Count               : {}".format(JIRACount)
-
-print border_msg("Total # Coding complete JIRAs : {} ".format(totalCount),\
-                 "JIRA List : {} ".format(", ".join(finalJIRAList)))
+print border_msg("PRs raised       : {}".format(", ".join(finalPRList)),\
+                 "JIRA List        : {}".format(", ".join(finalJIRAList)),\
+                 "Total JIRA Count : {} ".format(totalCount))
 
 #################################################################################################################################################
 
@@ -104,38 +122,8 @@ print "_"*50
 print "Details of PRs Closed"
 print "_"*50
 
-totalCount = 0
-finalJIRAList = []
+finalPRList, finalJIRAList, totalCount = pr_query(closedSearch, authors)
 
-# PRs Closed
-for author in authors:
-    print "*" * 50
-    print "Author : {}".format(author)
-    search = closedSearch + author
-    searchBox = driver.find_element_by_id("js-issues-search")
-    searchBox.clear()
-    searchBox.send_keys(search)
-    searchBox.send_keys(Keys.ENTER)
-    time.sleep(5)
-
-    # PR details
-    JIRAs = []
-    JIRACount = 0
-    if len(driver.find_elements_by_xpath("//div[@class='border-right border-bottom border-left']")) > 0:
-        prList = driver.find_element_by_xpath("//div[@class='border-right border-bottom border-left']")
-        listItems = prList.find_elements_by_tag_name("li")
-        for item in listItems:
-            pRDescription = item.text
-            jiraNumsList = re.findall(r"(ESTCV-\d+)", pRDescription)
-            JIRAs.extend(jiraNumsList)
-            JIRACount += len(jiraNumsList)
-            # TODO:
-            # jiraNumsList.count() == 0:
-    totalCount += JIRACount
-    finalJIRAList.extend(JIRAs)
-
-    print "PR Closed for JIRAs  : {}".format(", ".join(JIRAs))
-    print "Count                : {}".format(JIRACount)
-
-print border_msg("Total # Accepted JIRAs : {} ".format(totalCount),\
-                 "JIRA List : {} ".format(", ".join(finalJIRAList)))
+print border_msg("PRs closed       : {}".format(", ".join(finalPRList)),\
+                 "JIRA List        : {}".format(", ".join(finalJIRAList)),\
+                 "Total JIRA Count : {} ".format(totalCount))
