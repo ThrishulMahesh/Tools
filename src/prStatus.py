@@ -83,7 +83,6 @@ class prStatus:
                 for item in listItems:
                     pRDescription = item.text
                     if any(tag in pRDescription for tag in projectTag):
-                        print "yes"
                         for line in pRDescription.splitlines():
                             prMatch = re.match(r'(#\d+)', line)
                             if prMatch:
