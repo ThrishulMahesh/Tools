@@ -54,7 +54,7 @@ class utilities:
 
 class prStatus:
 
-    def pr_query(self, driver, query, authors, jiraIDPattern):
+    def pr_query(self, driver, query, authors, jiraIDPattern, projectTag):
         """
         """
         totalCount = 0
@@ -82,17 +82,18 @@ class prStatus:
                 listItems = prList.find_elements_by_tag_name("li")
                 for item in listItems:
                     pRDescription = item.text
-                    for line in pRDescription.splitlines():
-                        prMatch = re.match(r'(#\d+)', line)
-                        if prMatch:
-                            prNum = prMatch.group()
-                            break
-                    regex = r'({}-\d+)'.format(jiraIDPattern)
-                    jiraNumsList = re.findall(regex, pRDescription)
-                    prJiraDict.update({prNum: jiraNumsList})
-                    PRs.append(prNum)
-                    JIRAs.extend(jiraNumsList)
-                    JIRACount += len(jiraNumsList)
+                    if any(tag in pRDescription for tag in projectTag):
+                        for line in pRDescription.splitlines():
+                            prMatch = re.match(r'(#\d+)', line)
+                            if prMatch:
+                                prNum = prMatch.group()
+                                break
+                        regex = r'({}-\d+)'.format(jiraIDPattern)
+                        jiraNumsList = re.findall(regex, pRDescription)
+                        prJiraDict.update({prNum: jiraNumsList})
+                        PRs.append(prNum)
+                        JIRAs.extend(jiraNumsList)
+                        JIRACount += len(jiraNumsList)
 
             totalCount += JIRACount
             finalJIRAList.extend(JIRAs)
@@ -123,11 +124,13 @@ class prStatus:
         gitPRLink = raw_input("Enter Git repo PR link\n Example- https://github.com/xyz/Repo_Name/pulls : ")
         userName = raw_input("Enter Github Username : ")
         password = getpass.getpass("Enter Github Password : ")
-        authorsInput = raw_input("Enter list of Authors to query status\n Example - abc pqr xyz  : ")
+        authorsInput = raw_input("Enter list of Authors to query status\n Example - userID1 userID2 userID3  : ")
         authors = authorsInput.split()
         date = raw_input("Enter Status query Date\n(For single day - YYYY-MM-DD\n For range - YYYY-MM-DD..YYYY-MM-DD) : ")
         jiraIDPattern = raw_input("Enter JIRA ID pattern : ")
-        return gitPRLink, userName, password, authors, date, jiraIDPattern
+        projectTagInput = raw_input("Enter list of Project Tags to query for\n Example - Tag1 Tag2 Tag3  : ")
+        projectTags = projectTagInput.split()
+        return gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags
 
     def setup_browser(self, url):
         """
@@ -139,7 +142,7 @@ class prStatus:
         driver.get(url)
         return driver
 
-    def pr_create_status(self, driver, date, authors, jiraIDPattern):
+    def pr_create_status(self, driver, date, authors, jiraIDPattern, projectTags):
         """
         """
         createdSearch = "is:pr created:{} author:".format(date)
@@ -147,21 +150,21 @@ class prStatus:
         logging.info("_" * 50)
         logging.info("Details of PRs Created")
         logging.info("_" * 50)
-        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, createdSearch, authors, jiraIDPattern)
+        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, createdSearch, authors, jiraIDPattern, projectTags)
 
         utilObj = utilities()
         logging.info(utilObj.border_msg("PRs raised       : {}".format(", ".join(finalPRList)), \
                                         "JIRA List        : {}".format(", ".join(finalJIRAList)), \
                                         "Total JIRA Count : {} ".format(totalCount)))
 
-    def pr_merged_status(self, driver, date, authors, jiraIDPattern):
+    def pr_merged_status(self, driver, date, authors, jiraIDPattern, projectTags):
         """
         """
         closedSearch = "is:pr merged:{} author:".format(date)
         logging.info("_" * 50)
         logging.info("Details of PRs Merged")
         logging.info("_" * 50)
-        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, closedSearch, authors, jiraIDPattern)
+        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, closedSearch, authors, jiraIDPattern, projectTags)
 
         utilObj = utilities()
         logging.info(utilObj.border_msg("PRs merged       : {}".format(", ".join(finalPRList)), \
@@ -180,12 +183,12 @@ def main():
 
     # Query Status
     prStatusObj = prStatus()
-    gitPRLink, userName, password, authors, date, jiraIDPattern = prStatusObj.get_user_input()
+    gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags = prStatusObj.get_user_input()
     logging.info("STATUS Report: {}".format(date))
     driver = prStatusObj.setup_browser(gitPRLink)
     prStatusObj.login(driver, userName, password)
-    prStatusObj.pr_create_status(driver, date, authors, jiraIDPattern)
-    prStatusObj.pr_merged_status(driver, date, authors, jiraIDPattern)
+    prStatusObj.pr_create_status(driver, date, authors, jiraIDPattern, projectTags)
+    prStatusObj.pr_merged_status(driver, date, authors, jiraIDPattern, projectTags)
     driver.close()
 
 
