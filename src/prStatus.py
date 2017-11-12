@@ -4,13 +4,16 @@ Created on Nov 09, 2017
 @authors: Indu
 '''
 import os
-from selenium import webdriver
-from selenium.webdriver import ActionChains
 import time
 import re
 import getpass
+import logging
+import sys
+from selenium import webdriver
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
+
 
 class utilities:
 
@@ -32,6 +35,23 @@ class utilities:
         output += "+{dash}+\n".format(dash=dash)
         return output
 
+    def log_setup(self, logDirPath = None, logFileNamePattern = None):
+
+        # Disable Request logging
+        logging.getLogger("urllib3").setLevel(logging.CRITICAL)
+        logging.getLogger("request").setLevel(logging.CRITICAL)
+
+        if not logDirPath and not logFileNamePattern :
+            logging.basicConfig(stream=sys.stdout, level= logging.INFO,
+                                format='%(message)s')
+        else:
+            if not os.path.exists(logDirPath):
+                os.mkdir(logDirPath)
+            logFileName = r'{}_{}.log'.format(logFileNamePattern, time.strftime("%Y%m%d-%H%M%S"))
+            logFilePath = r'{}\{}'.format(logDirPath, logFileName)
+            logging.basicConfig(filename=logFilePath.format(int(time.time())),
+                                level=logging.INFO, format='%(message)s')
+
 class prStatus:
 
     def pr_query(self, driver, query, authors, jiraIDPattern):
@@ -43,8 +63,8 @@ class prStatus:
 
         # Get PR details for each author
         for author in authors:
-            print "*" * 50
-            print "Author       : {}".format(author)
+            logging.info("*" * 50)
+            logging.info("Author       : {}".format(author))
             search = query + author
             searchBox = driver.find_element_by_id("js-issues-search")
             searchBox.clear()
@@ -65,12 +85,12 @@ class prStatus:
                     for line in pRDescription.splitlines():
                         prMatch = re.match(r'(#\d+)', line)
                         if prMatch:
-                            pr = prMatch.group()
+                            prNum = prMatch.group()
                             break
                     regex = r'({}-\d+)'.format(jiraIDPattern)
                     jiraNumsList = re.findall(regex, pRDescription)
-                    prJiraDict.update({pr: jiraNumsList})
-                    PRs.append(pr)
+                    prJiraDict.update({prNum: jiraNumsList})
+                    PRs.append(prNum)
                     JIRAs.extend(jiraNumsList)
                     JIRACount += len(jiraNumsList)
 
@@ -78,10 +98,10 @@ class prStatus:
             finalJIRAList.extend(JIRAs)
             finalPRList.extend(PRs)
 
-            print "PR details   :"
-            for pr, jiraList in prJiraDict.iteritems():
-                print "     {}   -   {}".format(pr, ", ".join(jiraList))
-            print "JIRA Count   : {}".format(JIRACount)
+            logging.info("PR details   :")
+            for prNum, jiraList in prJiraDict.iteritems():
+                logging.info("     {}   -   {}".format(prNum, ", ".join(jiraList)))
+            logging.info("JIRA Count   : {}".format(JIRACount))
 
         return finalPRList, finalJIRAList, totalCount
 
@@ -100,14 +120,13 @@ class prStatus:
     def get_user_input(self):
         """
         """
-        gitPRLink = raw_input("Enter Git repo PR link\n Example- https://github.com/xyz/Tools/pulls : ")
+        gitPRLink = raw_input("Enter Git repo PR link\n Example- https://github.com/xyz/Repo_Name/pulls : ")
         userName = raw_input("Enter Github Username : ")
         password = getpass.getpass("Enter Github Password : ")
         authorsInput = raw_input("Enter list of Authors to query status\n Example - abc pqr xyz  : ")
         authors = authorsInput.split()
         date = raw_input("Enter Status query Date\n(For single day - YYYY-MM-DD\n For range - YYYY-MM-DD..YYYY-MM-DD) : ")
         jiraIDPattern = raw_input("Enter JIRA ID pattern : ")
-
         return gitPRLink, userName, password, authors, date, jiraIDPattern
 
     def setup_browser(self, url):
@@ -125,42 +144,50 @@ class prStatus:
         """
         createdSearch = "is:pr created:{} author:".format(date)
         # createdSearch = "is:pr created:2017-11-01..2017-11-02 author:"
-        print "_" * 50
-        print "Details of PRs Created"
-        print "_" * 50
+        logging.info("_" * 50)
+        logging.info("Details of PRs Created")
+        logging.info("_" * 50)
         finalPRList, finalJIRAList, totalCount = self.pr_query(driver, createdSearch, authors, jiraIDPattern)
 
         utilObj = utilities()
-        print utilObj.border_msg("PRs raised       : {}".format(", ".join(finalPRList)), \
-                                 "JIRA List        : {}".format(", ".join(finalJIRAList)), \
-                                 "Total JIRA Count : {} ".format(totalCount))
+        logging.info(utilObj.border_msg("PRs raised       : {}".format(", ".join(finalPRList)), \
+                                        "JIRA List        : {}".format(", ".join(finalJIRAList)), \
+                                        "Total JIRA Count : {} ".format(totalCount)))
 
-    def pr_close_status(self, driver, date, authors, jiraIDPattern):
+    def pr_merged_status(self, driver, date, authors, jiraIDPattern):
         """
         """
-        closedSearch = "is:pr closed:{} author:".format(date)
-        print "_" * 50
-        print "Details of PRs Closed"
-        print "_" * 50
+        closedSearch = "is:pr merged:{} author:".format(date)
+        logging.info("_" * 50)
+        logging.info("Details of PRs Merged")
+        logging.info("_" * 50)
         finalPRList, finalJIRAList, totalCount = self.pr_query(driver, closedSearch, authors, jiraIDPattern)
 
         utilObj = utilities()
-        print utilObj.border_msg("PRs closed       : {}".format(", ".join(finalPRList)), \
-                                 "JIRA List        : {}".format(", ".join(finalJIRAList)), \
-                                 "Total JIRA Count : {} ".format(totalCount))
+        logging.info(utilObj.border_msg("PRs merged       : {}".format(", ".join(finalPRList)), \
+                                        "JIRA List        : {}".format(", ".join(finalJIRAList)), \
+                                        "Total JIRA Count : {} ".format(totalCount)))
 
 
 def main():
     """
     """
+    # Setup logging
+    utilObj = utilities()
+    reportDirPath = r'{}\{}'.format(os.path.dirname(os.path.realpath(__file__)), "StatusReports")
+    utilObj.log_setup(reportDirPath, "Status_Report")
+    # utilObj.log_setup()  # To generate report on console
+
+    # Query Status
     prStatusObj = prStatus()
     gitPRLink, userName, password, authors, date, jiraIDPattern = prStatusObj.get_user_input()
-    print "STATUS Report: {}".format(date)
+    logging.info("STATUS Report: {}".format(date))
     driver = prStatusObj.setup_browser(gitPRLink)
     prStatusObj.login(driver, userName, password)
     prStatusObj.pr_create_status(driver, date, authors, jiraIDPattern)
-    prStatusObj.pr_close_status(driver, date, authors, jiraIDPattern)
+    prStatusObj.pr_merged_status(driver, date, authors, jiraIDPattern)
     driver.close()
+
 
 if __name__ == "__main__":
     main()
