@@ -146,7 +146,6 @@ class prStatus:
         """
         """
         createdSearch = "is:pr created:{} author:".format(date)
-        # createdSearch = "is:pr created:2017-11-01..2017-11-02 author:"
         logging.info("_" * 50)
         logging.info("Details of PRs Created")
         logging.info("_" * 50)
