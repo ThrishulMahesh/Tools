@@ -54,7 +54,7 @@ class utilities:
 
 class prStatus:
 
-    def pr_query(self, driver, query, authors, jiraIDPattern, projectTag):
+    def pr_query(self, driver, query, authors, jiraIDPattern, projectTag, detailedReportFlag = False):
         """
         """
         totalCount = 0
@@ -63,8 +63,6 @@ class prStatus:
 
         # Get PR details for each author
         for author in authors:
-            logging.info("*" * 50)
-            logging.info("Author       : {}".format(author))
             search = query + author
             searchBox = driver.find_element_by_id("js-issues-search")
             searchBox.clear()
@@ -101,10 +99,13 @@ class prStatus:
             finalJIRAList.extend(JIRAs)
             finalPRList.extend(PRs)
 
-            logging.info("PR details   :")
-            for prNum, jiraList in prJiraDict.iteritems():
-                logging.info("     {}   -   {}".format(prNum, ", ".join(jiraList)))
-            logging.info("JIRA Count   : {}".format(JIRACount))
+            if detailedReportFlag:
+                logging.info("*" * 50)
+                logging.info("Author       : {}".format(author))
+                logging.info("PR details   :")
+                for prNum, jiraList in prJiraDict.iteritems():
+                    logging.info("     {}   -   {}".format(prNum, ", ".join(jiraList)))
+                logging.info("JIRA Count   : {}".format(JIRACount))
 
         return finalPRList, finalJIRAList, totalCount
 
@@ -132,8 +133,8 @@ class prStatus:
         jiraIDPattern = raw_input("Enter JIRA ID pattern : ")
         projectTagInput = raw_input("Enter list of Project Tags to query for\n Example - Tag1 Tag2 Tag3  : ")
         projectTags = projectTagInput.split()
-
-        return gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags
+        detailedReportFlag = raw_input("Enter 'D' to get detailed status report for each author \n Enter 'C' for consolidated status report : ")
+        return gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags, detailedReportFlag
 
     def setup_browser(self, url):
         """
@@ -145,33 +146,49 @@ class prStatus:
         driver.get(url)
         return driver
 
-    def pr_create_status(self, driver, date, authors, jiraIDPattern, projectTags):
+    def pr_create_status(self, driver, date, authors, jiraIDPattern, projectTags, detailedReportFlag):
         """
         """
         createdSearch = "is:pr created:{} author:".format(date)
         logging.info("_" * 50)
         logging.info("Details of PRs Created")
         logging.info("_" * 50)
-        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, createdSearch, authors, jiraIDPattern, projectTags)
+        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, createdSearch, authors, jiraIDPattern, projectTags, detailedReportFlag)
 
         utilObj = utilities()
         logging.info(utilObj.border_msg("PRs raised       : {}".format(", ".join(finalPRList)), \
                                         "JIRA List        : {}".format(", ".join(finalJIRAList)), \
                                         "Total JIRA Count : {} ".format(totalCount)))
 
-    def pr_merged_status(self, driver, date, authors, jiraIDPattern, projectTags):
+    def pr_merged_status(self, driver, date, authors, jiraIDPattern, projectTags, detailedReportFlag):
         """
         """
-        closedSearch = "is:pr merged:{} author:".format(date)
+        mergedSearch = "is:pr merged:{} author:".format(date)
         logging.info("_" * 50)
         logging.info("Details of PRs Merged")
         logging.info("_" * 50)
-        finalPRList, finalJIRAList, totalCount = self.pr_query(driver, closedSearch, authors, jiraIDPattern, projectTags)
+        finalPRMergeList, finalJIRAMergeList, totalMergeCount = self.pr_query(driver, mergedSearch, authors, \
+                                                                              jiraIDPattern, projectTags, detailedReportFlag)
 
         utilObj = utilities()
-        logging.info(utilObj.border_msg("PRs merged       : {}".format(", ".join(finalPRList)), \
-                                        "JIRA List        : {}".format(", ".join(finalJIRAList)), \
-                                        "Total JIRA Count : {} ".format(totalCount)))
+        logging.info(utilObj.border_msg("PRs merged       : {}".format(", ".join(finalPRMergeList)), \
+                                        "JIRA List        : {}".format(", ".join(finalJIRAMergeList)), \
+                                        "Total JIRA Count : {} ".format(totalMergeCount)))
+
+        # Search for PRs which were Closed without merging
+        closedSearch = "is:pr closed:{} author:".format(date)
+        logging.info("_" * 50)
+        logging.info("PRs Closed without Merging")
+        logging.info("_" * 50)
+        finalPRClosedList, finalJIRAClosedList, totalClosedCount = self.pr_query(driver, closedSearch, authors,\
+                                                                                 jiraIDPattern, projectTags, False)
+
+        closedPRs = list(set(finalPRClosedList) - set(finalPRMergeList))
+        closedJIRAs = list(set(finalJIRAClosedList) - set(finalJIRAMergeList))
+
+        logging.info(utilObj.border_msg("PRs Closed without Merge       : {}".format(", ".join(closedPRs)), \
+                                        "JIRA List                      : {}".format(", ".join(closedJIRAs)), \
+                                        "Total JIRA Count               : {} ".format(len(closedJIRAs))))
 
 
 def main():
@@ -185,12 +202,14 @@ def main():
 
     # Query Status
     prStatusObj = prStatus()
-    gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags = prStatusObj.get_user_input()
+    gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags, detailedReportFlag = prStatusObj.get_user_input()
+    detailedReportFlag = True if detailedReportFlag.upper() == 'D' else False
+
     logging.info("STATUS Report: {}".format(date))
     driver = prStatusObj.setup_browser(gitPRLink)
     prStatusObj.login(driver, userName, password)
-    prStatusObj.pr_create_status(driver, date, authors, jiraIDPattern, projectTags)
-    prStatusObj.pr_merged_status(driver, date, authors, jiraIDPattern, projectTags)
+    prStatusObj.pr_create_status(driver, date, authors, jiraIDPattern, projectTags, detailedReportFlag)
+    prStatusObj.pr_merged_status(driver, date, authors, jiraIDPattern, projectTags, detailedReportFlag)
     driver.close()
 
 
