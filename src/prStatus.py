@@ -88,12 +88,14 @@ class prStatus:
                             if prMatch:
                                 prNum = prMatch.group()
                                 break
-                        regex = r'({}-\d+)'.format(jiraIDPattern)
-                        jiraNumsList = re.findall(regex, pRDescription)
-                        prJiraDict.update({prNum: jiraNumsList})
-                        PRs.append(prNum)
-                        JIRAs.extend(jiraNumsList)
-                        JIRACount += len(jiraNumsList)
+                        for line in pRDescription.splitlines():
+                            if jiraIDPattern in line:
+                                jiraNumsList = re.findall(r'\d+', line.split(':')[1])
+                                jiraNumsList = ['{}-{}'.format(jiraIDPattern, id) for id in jiraNumsList]
+                                prJiraDict.update({prNum: jiraNumsList})
+                                PRs.append(prNum)
+                                JIRAs.extend(jiraNumsList)
+                                JIRACount += len(jiraNumsList)
 
             totalCount += JIRACount
             finalJIRAList.extend(JIRAs)
@@ -130,6 +132,7 @@ class prStatus:
         jiraIDPattern = raw_input("Enter JIRA ID pattern : ")
         projectTagInput = raw_input("Enter list of Project Tags to query for\n Example - Tag1 Tag2 Tag3  : ")
         projectTags = projectTagInput.split()
+
         return gitPRLink, userName, password, authors, date, jiraIDPattern, projectTags
 
     def setup_browser(self, url):
