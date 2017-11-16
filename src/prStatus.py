@@ -1,7 +1,7 @@
 '''
 Created on Nov 09, 2017
 
-@authors: Indu
+@authors:
 '''
 import os
 import time
